@@ -20,6 +20,7 @@ import requests
 import torch
 
 from ultralytics.utils import (
+    ROOT,
     ASSETS,
     AUTOINSTALL,
     IS_COLAB,
@@ -609,7 +610,7 @@ def collect_system_info():
         )
 
 
-def check_amp(model):
+def check_amp(model,depth):
     """
     This function checks the PyTorch Automatic Mixed Precision (AMP) functionality of a YOLOv8 model. If the checks
     fail, it means there are anomalies with AMP on the system that may cause NaN losses or zero-mAP results, so AMP will
@@ -648,8 +649,20 @@ def check_amp(model):
     warning_msg = "Setting 'amp=True'. If you experience zero-mAP or NaN losses you can disable AMP with amp=False."
     try:
         from ultralytics import YOLO
-
-        assert amp_allclose(YOLO("yolov8n.pt"), im)
+        if depth:
+            yolo =  YOLO(f'{ROOT}/yolov8.yaml')
+            im = im = np.load(f'{ASSETS}/potato.npz')
+            im = im["array"]
+            current_min = np.min(im[np.nonzero(im)])
+            current_max = np.max(im[np.nonzero(im)])
+            mask = im !=0
+            im = np.where(mask,((im - current_min) / (current_max - current_min)) * (1 - 0) + 0, im)
+            im = im*255
+            im = np.expand_dims(im,axis=0)
+            im = im.transpose((1,2,0))
+        else:
+            yolo = YOLO("yolov8n.pt")
+        assert amp_allclose(yolo, im)
         LOGGER.info(f"{prefix}checks passed ✅")
     except ConnectionError:
         LOGGER.warning(f"{prefix}checks skipped ⚠️, offline and unable to download YOLOv8n. {warning_msg}")

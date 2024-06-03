@@ -291,7 +291,10 @@ class Annotator:
 
     def rectangle(self, xy, fill=None, outline=None, width=1):
         """Add rectangle to image (PIL-only)."""
-        self.draw.rectangle(xy, fill, outline, width)
+        if self.pil:
+            self.draw.rectangle(xy, fill, outline, width)
+        else:
+            self.im = cv2.rectangle(self.im,(xy[1],xy[0]),(xy[3],xy[2]),outline,width)
 
     def text(self, xy, text, txt_color=(255, 255, 255), anchor="top", box_style=False):
         """Adds text to an image using PIL or cv2."""
@@ -787,6 +790,7 @@ def plot_images(
     max_subplots=16,
     save=True,
     conf_thres=0.25,
+    num_channel = 3
 ):
     """Plot image grid with labels."""
     if isinstance(images, torch.Tensor):
@@ -810,7 +814,7 @@ def plot_images(
         images *= 255  # de-normalise (optional)
 
     # Build Image
-    mosaic = np.full((int(ns * h), int(ns * w), 3), 255, dtype=np.uint8)  # init
+    mosaic = np.full((int(ns * h), int(ns * w), num_channel), 255, dtype=np.uint8)  # init
     for i in range(bs):
         x, y = int(w * (i // ns)), int(h * (i % ns))  # block origin
         mosaic[y : y + h, x : x + w, :] = images[i].transpose(1, 2, 0)
@@ -824,7 +828,11 @@ def plot_images(
 
     # Annotate
     fs = int((h + w) * ns * 0.01)  # font size
-    annotator = Annotator(mosaic, line_width=round(fs / 10), font_size=fs, pil=True, example=names)
+    if num_channel==3:
+        pil=True
+    else:
+        pil = False
+    annotator = Annotator(mosaic, line_width=round(fs / 10), font_size=fs, pil=pil, example=names)
     for i in range(bs):
         x, y = int(w * (i // ns)), int(h * (i % ns))  # block origin
         annotator.rectangle([x, y, x + w, y + h], None, (255, 255, 255), width=2)  # borders
@@ -850,7 +858,10 @@ def plot_images(
                 boxes = ops.xywhr2xyxyxyxy(boxes) if is_obb else ops.xywh2xyxy(boxes)
                 for j, box in enumerate(boxes.astype(np.int64).tolist()):
                     c = classes[j]
-                    color = colors(c)
+                    if annotator.pil:
+                        color = colors(c)
+                    else:
+                        color = (0,0,0)
                     c = names.get(c, c) if names else c
                     if labels or conf[j] > conf_thres:
                         label = f"{c}" if labels else f"{c} {conf[j]:.1f}"
@@ -906,7 +917,10 @@ def plot_images(
                 annotator.fromarray(im)
     if not save:
         return np.asarray(annotator.im)
-    annotator.im.save(fname)  # save
+    if annotator.pil:
+        annotator.im.save(fname)  # save
+    else:
+        cv2.imwrite(str(fname),annotator.im)
     if on_plot:
         on_plot(fname)
 

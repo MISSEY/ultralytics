@@ -154,7 +154,11 @@ class BaseValidator:
             self.dataloader = self.dataloader or self.get_dataloader(self.data.get(self.args.split), self.args.batch)
 
             model.eval()
-            model.warmup(imgsz=(1 if pt else self.args.batch, 3, imgsz, imgsz))  # warmup
+            if self.args.depth:
+                num_channels = 1
+            else:
+                num_channels =3
+            model.warmup(imgsz=(1 if pt else self.args.batch, num_channels, imgsz, imgsz))  # warmup
 
         self.run_callbacks("on_val_start")
         dt = (

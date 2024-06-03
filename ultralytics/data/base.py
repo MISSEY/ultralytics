@@ -93,6 +93,8 @@ class BaseDataset(Dataset):
         self.cache = cache.lower() if isinstance(cache, str) else "ram" if cache is True else None
         if (self.cache == "ram" and self.check_cache_ram()) or self.cache == "disk":
             self.cache_images()
+        
+        self.depth = hyp.depth
 
         # Transforms
         self.transforms = self.build_transforms(hyp=hyp)
@@ -154,7 +156,17 @@ class BaseDataset(Dataset):
                     Path(fn).unlink(missing_ok=True)
                     im = cv2.imread(f)  # BGR
             else:  # read image
-                im = cv2.imread(f)  # BGR
+                if self.depth:
+                    im = np.load(f)
+                    im = im["array"]
+                    current_min = np.min(im[np.nonzero(im)])
+                    current_max = np.max(im[np.nonzero(im)])
+                    mask = im !=0
+                    im = np.where(mask,((im - current_min) / (current_max - current_min)) * (1 - 0) + 0, im)
+                    im = im*255
+                else:
+                    im = cv2.imread(f)  # BGR
+                    
             if im is None:
                 raise FileNotFoundError(f"Image Not Found {f}")
 
